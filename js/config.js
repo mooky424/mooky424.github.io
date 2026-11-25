@@ -12,19 +12,19 @@ window.SITE_CONFIG = {
     {
       name: "Gabriel Salvador",
       role: "Technical Lead & Web Lead",
-      href: "./",
+      href: "mooky424.github.io",
       here: true
     },
     {
       name: "Kristine Banzon",
       role: "Content Communicator & Media Designer",
-      href: "./",
+      href: "kristine-banzon.github.io",
       here: false
     },
     {
       name: "Giuliana Bautista",
       role: "Lead Researcher & LaTeX Lead",
-      href: "./",
+      href: "giulianabautista.github.io",
       here: false
     }
   ]
