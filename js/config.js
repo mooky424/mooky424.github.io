@@ -23,7 +23,7 @@ window.SITE_CONFIG = {
     },
     {
       name: "Giuliana Bautista",
-      href: "Lead Researcher & LaTeX Lead",
+      role: "Lead Researcher & LaTeX Lead",
       href: "./",
       here: false
     }
