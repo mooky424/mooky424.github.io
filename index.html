@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Haskell · CSCI 202 tutorial</title>
+  <meta name="description" content="CSCI 202 Haskell tutorial: paradigm, problem-solving style, syntax, features, and sample programs.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%2316251e' width='32' height='32' rx='6'/%3E%3Ctext x='6' y='23' fill='%23f0a57a' font-size='18' font-family='Georgia'%3E%CE%BB%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/styles.css?v=13">
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <div class="layout">
+    <nav class="site-nav" aria-label="Tutorial sections">
+      <a href="#background">How it works</a>
+      <a href="#drawbacks">Drawbacks</a>
+      <a href="#prelude">Prelude</a>
+      <a href="#types">Types</a>
+      <a href="#ladder">Type classes</a>
+      <a href="#monad">Monads</a>
+      <a href="#syntax">Syntax</a>
+      <a href="#features">Features</a>
+      <a href="#design">Functions</a>
+      <a href="#curry">Currying</a>
+      <a href="#examples">Examples</a>
+      <a href="#sandbox">Sandbox</a>
+      <a href="#group">Group &amp; paper</a>
+      <a class="nav-pdf" data-paper href="https://drive.google.com/drive/folders/1ZQeTZFPqxqp_o-ASNNVVfVjlWMM9LJ6w?usp=sharing" target="_blank" rel="noopener noreferrer">Paper PDF</a>
+    </nav>
+
+    <main id="content">
+      <header class="hero">
+        <p class="kicker" id="byline">CSCI 202 · Final project · Gabriel Salvador</p>
+        <h1>Haskell</h1>
+        <p class="lede">Released in 1990, Haskell is a purely functional, non-strict programming language with strong, static typing. Commonly used in applications where reliability and correctness are critical, such as academia, finance, and embedded systems.</p>
+        <pre class="ghci" aria-label="GHCi sample">Prelude&gt; 1 + 1
+2
+Prelude&gt; True &amp;&amp; False
+False
+Prelude&gt; :t "csci"
+"csci" :: [Char]</pre>
+        <div class="hero-actions">
+          <a class="button primary" href="#examples">Sample programs</a>
+          <a class="button" href="#sandbox">Open the sandbox</a>
+          <a class="button" data-paper href="https://drive.google.com/drive/folders/1ZQeTZFPqxqp_o-ASNNVVfVjlWMM9LJ6w?usp=sharing" target="_blank" rel="noopener noreferrer">Download the paper (PDF)</a>
+        </div>
+      </header>
+
+      <section id="background">
+        <h2>How Haskell functions, and how you solve problems with it</h2>
+        <h3 id="paradigm">Pure, non-strict, and statically typed</h3>
+        <p>A Haskell program is a set of equations. Three commitments decide what those equations mean when they run.</p>
+        <ul>
+          <li><strong>Purely functional.</strong> Functions behave like mathematical functions, which is the lambda-calculus basis. The same arguments always produce the same result. There are no statements that mutate a local or global variable, and a pure function cannot read the clock or a random generator. Every computation is a function with no side effect. Effects that a whole program does need, such as printing, are values of type <code>IO</code>.</li>
+          <li><strong>Non-strict.</strong> An expression is evaluated only when its value is needed. That is what lets a program name an infinite structure and then use a finite piece of it. <code>take 5 [1..]</code> builds five numbers. A function that never looks at an undefined argument can still return a useful result.</li>
+          <li><strong>Strong, static typing.</strong> Every expression has a type, and that type is fixed at compile time. If the types in a function application do not match, GHC rejects the program before it runs. Types are also a way of saying how the program is built. You do not have to write every signature: inference fills them in by unifying types in both directions. Writing a signature anyway documents the equation, and <code>:t</code> in GHCi will print the one the compiler inferred.</li>
+        </ul>
+        <h3 id="style">Functions instead of instructions</h3>
+        <p>That is the mindset for solving a problem. Describe what a value is, and let the evaluator demand the pieces it needs. There is no loop variable to update and no mutable accumulator. Recursion, <code>map</code>, <code>filter</code>, and folds take that place.</p>
+        <p>The practical payoff is a small semantic gap. The equation you would write on paper and the equation in the file are close, so the program stays modifiable. That shows up where reliability matters: web apps, tools, and systems; mathematical modeling and financial analytics; embedded systems and IoT; academic research; concurrent and parallel programming; and formal verification. GHC also talks to other languages through a foreign interface, so a Haskell core can sit next to C.</p>
+        <h3>Ecosystem</h3>
+        <p>Source files use the extension <code>.hs</code>. The everyday tools around those equations are:</p>
+        <ul>
+          <li><strong>GHC</strong>, the Glasgow Haskell Compiler, is the flagship compiler. <code>ghc filename.hs</code> compiles a file. On Windows the result is <code>filename.exe</code>. On Unix it is <code>./filename</code>.</li>
+          <li><strong>GHCi</strong> is the interactive debugger and interpreter. <code>:t</code> asks for a type, <code>:reload</code> picks up a save.</li>
+          <li><strong>Stack</strong> is the project tool: it pins a compiler version and builds a package. <code>stack ghci</code> and <code>stack build</code> are the everyday commands.</li>
+          <li><strong>Packages</strong> live on Hackage. The Prelude is the module every program imports for you. <code>Data.List</code>, <code>Data.Char</code>, <code>Data.Map</code>, and <code>Data.Set</code> are the next ones people reach for, and a project can define its own modules.</li>
+        </ul>
+      </section>
+
+      <section id="drawbacks">
+        <h2>Where Haskell is the harder choice</h2>
+        <ul>
+          <li><strong>Less mainstream.</strong> Hiring, examples, and production stories are thinner than for the languages most teams already use.</li>
+          <li><strong>Lazy evaluation can bottleneck performance.</strong> Work can pile up unevaluated and hold memory until something demands the number. Predicting cost means knowing what is demanded.</li>
+          <li><strong>Fewer libraries than Python or Java.</strong> Hackage is real, and it is not those ecosystems.</li>
+          <li><strong>A steep curve</strong> for someone whose habits come from another paradigm: guards, monads, and type-class errors are the wall after the first pleasant functions.</li>
+        </ul>
+      </section>
+
+      <section id="prelude">
+        <h2>Prelude</h2>
+        <p><code>Prelude&gt;</code> is GHCi's prompt before you load a file. Whatever you type there is an expression, and GHCi prints the value. <code>:t</code> prints the type instead.</p>
+        <pre class="ghci">Prelude&gt; 1 + 1
+2
+
+Prelude&gt; :t 'a'
+'a' :: Char
+
+Prelude&gt; :t "a"
+"a" :: [Char]
+
+Prelude&gt; :t "csci"
+"csci" :: [Char]
+
+Prelude&gt; True &amp;&amp; False
+False
+
+Prelude&gt; if True then 1 else 0
+1
+
+Prelude&gt; if 2 &gt; 5 then "yes" else "no"
+"no"</pre>
+        <h3>Executing a file</h3>
+        <p>A source file ends in <code>.hs</code>. <code>:load</code> brings its definitions into GHCi, and the prompt leaves <code>Prelude&gt;</code>. <code>main</code> runs the program. <code>ghc Hello.hs</code> compiles that same file: <code>Hello.exe</code> on Windows, <code>./Hello</code> on Unix. The program itself is in the <a href="#examples">examples</a>.</p>
+        <pre class="ghci">Prelude&gt; :load Hello.hs
+[1 of 1] Compiling Main ( Hello.hs, interpreted )
+Ok, one module loaded.
+*Main&gt; main
+Hello World!</pre>
+      </section>
+
+      <section id="types">
+        <h2>Types</h2>
+        <div class="table-scroll">
+          <table class="matrix">
+            <thead><tr><th>Type</th><th>Values</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr id="type-int"><td><code>Int</code></td><td><code>0</code>, <code>42</code>, <code>-7</code></td><td>A fixed-size integer. The Haskell 2010 report guarantees at least the range <code>[-2^29 .. 2^29-1]</code>. GHC uses a machine word, so on a 64-bit desktop the range is much wider.</td></tr>
+              <tr id="type-word"><td><code>Word</code></td><td><code>0</code>, <code>42</code></td><td>An unsigned integer of the same width as <code>Int</code>. It has no negative values.</td></tr>
+              <tr id="type-integer"><td><code>Integer</code></td><td><code>0</code>, <code>100000000000000000000</code></td><td>An arbitrary-precision integer. It contains every <code>Int</code> and has no fixed bound.</td></tr>
+              <tr id="type-float"><td><code>Float</code>, <code>Double</code></td><td><code>1.0</code>, <code>3.14</code></td><td>Floating-point numbers. <code>quadraticRoots</code> is written with <code>Float</code>.</td></tr>
+              <tr id="type-bool"><td><code>Bool</code></td><td><code>True</code>, <code>False</code></td><td>The condition of <code>if</code>, and the result of a comparison.</td></tr>
+              <tr id="type-char"><td><code>Char</code></td><td><code>'a'</code></td><td>One character. A <code>String</code> is a list of these: <code>type String = [Char]</code>.</td></tr>
+              <tr id="type-rational"><td><code>Rational</code></td><td><code>1 % 2</code></td><td><code>type Rational = Ratio Integer</code>, a ratio of two integers.</td></tr>
+              <tr id="type-maybe"><td><code>Maybe a</code></td><td><code>Just 3</code>, <code>Nothing</code></td><td>A value that is there, or missing. <code>Just</code> holds the value, so <code>Just 3</code> has type <code>Maybe Int</code>, not <code>Int</code>. <code>Nothing</code> holds no value. <code>a</code> is the type inside, so <code>Maybe Char</code> uses the same two constructors.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <pre class="ghci">Prelude&gt; :t Just (3 :: Int)
+Just (3 :: Int) :: Maybe Int
+
+Prelude&gt; :t Nothing
+Nothing :: Maybe a</pre>
+      </section>
+
+      <section id="ladder">
+        <h2>The type-class ladder</h2>
+        <p>A class names an ability a type can have. <code>Eq</code>, <code>Ord</code>, and <code>Num</code> are the everyday ones on <code>Int</code> and <code>Char</code>: equality, order, and arithmetic. <code>Functor</code>, <code>Applicative</code>, and <code>Monad</code> are the other kind. Each one needs a type constructor such as the list constructor or <code>Maybe</code>, and <code>Int</code> has nothing for <code>fmap</code> to change.</p>
+        <div class="ladder">
+          <article>
+            <h3>Functor</h3>
+            <pre><code data-lang="haskell">class Functor f where
+  fmap :: (a -&gt; b) -&gt; f a -&gt; f b</code></pre>
+            <div class="controls">
+              <button type="button" data-ladder="fmap-list">Run on a list</button>
+              <button type="button" data-ladder="fmap-maybe">Run on Maybe</button>
+            </div>
+            <pre class="console" id="ladder-fmap" aria-live="polite">Press Run.</pre>
+          </article>
+          <article>
+            <h3>Applicative</h3>
+            <p>A Functor with <code>pure</code> and <code>&lt;*&gt;</code>. The class lives in <code>Control.Applicative</code>, and the Prelude re-exports it.</p>
+            <pre><code data-lang="haskell">class Functor f =&gt; Applicative f where
+  pure  :: a -&gt; f a
+  (&lt;*&gt;) :: f (a -&gt; b) -&gt; f a -&gt; f b</code></pre>
+            <div class="controls">
+              <button type="button" data-ladder="ap-just">Run on Just</button>
+              <button type="button" data-ladder="ap-nothing">Run on Nothing</button>
+            </div>
+            <pre class="console" id="ladder-ap" aria-live="polite">Press Run.</pre>
+          </article>
+          <article>
+            <h3>Monad</h3>
+            <pre><code data-lang="haskell">class Applicative m =&gt; Monad m where
+  return :: a -&gt; m a
+  (&gt;&gt;=)  :: m a -&gt; (a -&gt; m b) -&gt; m b</code></pre>
+            <p><a href="#monad"><code>Maybe</code> and <code>IO</code></a> use <code>return</code> and <code>&gt;&gt;=</code>.</p>
+          </article>
+        </div>
+
+        </section>
+
+      <section id="monad">
+        <h2>Monads</h2>
+        <p><code>add 2 5</code> is 7. A function that wants an <code>Int</code> can take that 7. <code>Just 3</code> is not an <code>Int</code>. Its type is <a href="#type-maybe"><code>Maybe Int</code></a>, the number or <code>Nothing</code>. <code>putStrLn "hi"</code> is not a string. It is a print that has not run yet. The next function still wants the plain value: the 3, or the <code>()</code> a print produces when it finishes.</p>
+        <p><code>return</code> wraps a plain value so the chain can start. For <code>Maybe</code>, <code>return 3</code> is <code>Just 3</code>. <code>&gt;&gt;=</code> takes the wrapper off and gives what was inside to the next function. That function has to return the same kind of wrapper: another <code>Maybe</code>, or another <code>IO</code>. <code>Nothing</code> has no number inside, so the next function is not called. An equation cannot print or change a variable on the side, so failure and printing are values of their own. That is why <code>main</code> has type <code>IO ()</code>, and why <code>add 2 5</code> stays an ordinary sum.</p>
+
+        <h3>Maybe can stop</h3>
+        <pre><code data-lang="haskell">next :: Int -&gt; Maybe Int
+next x = if x &gt; 2 then Just (x * 10) else Nothing</code></pre>
+        <p><code>return</code> for <code>Maybe</code> is <code>Just</code>. <code>Just 3 &gt;&gt;= next</code> opens the <code>Just</code>, and <code>next</code> sees 3, so it returns <code>Just 30</code>. <code>Just 1 &gt;&gt;= next</code> opens the <code>Just</code> as well, and <code>next</code> returns <code>Nothing</code>. A starting <code>Nothing</code> never calls <code>next</code>.</p>
+        <div class="controls">
+          <button type="button" data-ladder="bind-go">Run Just 3</button>
+          <button type="button" data-ladder="bind-stop">Run Just 1</button>
+        </div>
+        <pre class="console" id="monad-bind" aria-live="polite">Press Run.</pre>
+
+        <h3>The next step sees the value</h3>
+        <p><code>&lt;*&gt;</code> applies a function that is already sitting in the context. <code>&gt;&gt;=</code> builds the next context from the value it just unwrapped. <code>next</code> looks at the number and chooses <code>Just</code> or <code>Nothing</code>.</p>
+
+        <h3>IO is the same pair of methods</h3>
+        <p><code>do</code> writes a chain of <code>&gt;&gt;=</code> as steps.</p>
+        <pre><code data-lang="haskell">main = do
+  putStrLn "The sum of the two numbers is:"
+  print (add 2 5)
+
+-- the same steps
+putStrLn "The sum of the two numbers is:"
+  &gt;&gt;= \_ -&gt; print (add 2 5)</code></pre>
+        <p><code>putStrLn</code> produces <code>IO ()</code>. The lambda ignores that <code>()</code> and runs <code>print</code>. <code>add 2 5</code> stays a pure equation. The type of <code>main</code> is <code>IO ()</code>, so the printing stays in the type and the equations around it stay replaceable by their definitions.</p>
+
+        <h3>Three laws</h3>
+        <p><code>f &gt;=&gt; g</code> is the function that runs <code>f</code>, then binds <code>g</code>. Any monad has to obey these three equations, which is what lets a chain be replaced by the definitions of its steps:</p>
+        <pre><code data-lang="haskell">return &gt;=&gt; mf    = mf                 -- left identity
+mf &gt;=&gt; return    = mf                 -- right identity
+(f &gt;=&gt; g) &gt;=&gt; h  = f &gt;=&gt; (g &gt;=&gt; h)    -- associativity</code></pre>
+        <p>On <code>next</code>, left identity says <code>return 3 &gt;&gt;= next</code> equals <code>next 3</code>. Right identity says <code>Just 3 &gt;&gt;= return</code> equals <code>Just 3</code>. Associativity says the grouping does not matter: bind <code>next</code> and then <code>step</code>, where <code>step y = Just (y + 1)</code>, or bind the combined function.</p>
+        <div class="controls">
+          <button type="button" data-ladder="law-left">Run left identity</button>
+          <button type="button" data-ladder="law-right">Run right identity</button>
+          <button type="button" data-ladder="law-assoc">Run associativity</button>
+        </div>
+        <pre class="console" id="monad-laws" aria-live="polite">Press Run.</pre>
+      </section>
+
+      <section id="syntax">
+        <h2>Declarations on the left, behavior on the right</h2>
+        <pre><code data-lang="haskell">add :: Integer -&gt; Integer -&gt; Integer   -- declaration: the type
+add x y =                              -- definition: the behavior
+  x + y                                -- indent continues it; no semicolon
+
+main = print (add 2 5)                 -- f x, not f(x)
+-- parentheses group, they are not the call: (add 2 5) + 1
+-- not a call: add(2, 5)</code></pre>
+        <pre class="ghci">ghci&gt; add 2 5
+7
+
+ghci&gt; (add 2 5) + 1
+8</pre>
+        <h3>Lists, tuples, and a comprehension</h3>
+        <h4>Lists and tuples</h4>
+        <div class="table-scroll">
+          <table class="matrix">
+            <thead><tr><th>Form</th><th>Example</th><th>What it is</th></tr></thead>
+            <tbody>
+              <tr><td>List</td><td><code>[1,2,3]</code></td><td>Homogeneous: every element has one type.</td></tr>
+              <tr><td><code>[]</code></td><td><code>[]</code></td><td>The empty list.</td></tr>
+              <tr><td><code>[p]</code></td><td><code>[1]</code></td><td>A one-element list.</td></tr>
+              <tr><td><code>++</code></td><td><code>[1,2] ++ [3]</code></td><td>Concatenates two lists. The result is <code>[1,2,3]</code>.</td></tr>
+              <tr><td><code>(x:xs)</code></td><td><code>1 : [2,3]</code></td><td>Builds <code>[1,2,3]</code>. The same pattern splits a non-empty list into head <code>1</code> and tail <code>[2,3]</code>.</td></tr>
+              <tr><td><code>(!!)</code></td><td><code>[10,20,30] !! 0</code></td><td>Indexes a list, starting at 0. The result is <code>10</code>.</td></tr>
+              <tr><td>Tuple</td><td><code>(1, 1, 'a')</code></td><td>Heterogeneous: the slots may differ.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h4>List comprehension</h4>
+        <div class="table-scroll">
+          <table class="matrix">
+            <thead><tr><th>Operation</th><th>Written</th><th>Result</th></tr></thead>
+            <tbody>
+              <tr><td>Output expression</td><td><code>[x * 2 | x &lt;- [1..5]]</code></td><td><code>[2,4,6,8,10]</code>. The expression left of <code>|</code> is the value of each row.</td></tr>
+              <tr><td>Generator</td><td><code>x &lt;- [1..5]</code></td><td>Draws one element at a time from the list on the right.</td></tr>
+              <tr><td>Guard</td><td><code>[x | x &lt;- [1..5], odd x]</code></td><td><code>[1,3,5]</code>. A boolean qualifier keeps the rows where it is true.</td></tr>
+              <tr><td>Several generators</td><td><code>[(x, y) | x &lt;- [1,2], y &lt;- "ab"]</code></td><td><code>[(1,'a'),(1,'b'),(2,'a'),(2,'b')]</code>. The later generator runs once for each earlier value.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <pre class="ghci">Prelude&gt; [x * 2 | x &lt;- [1..5]]
+[2,4,6,8,10]
+
+Prelude&gt; (1, 1, 'a')
+(1,1,'a')
+
+Prelude&gt; [1,2,3,4,5,a,b,c,d,e,f]
+-- error: Variable not in scope: a</pre>
+        <p>The last line fails before the type checker, because <code>a</code>, <code>b</code>, and the rest are names, not characters. Quoting them as <code>'a'</code> would still fail: a list cannot mix <code>Int</code> and <code>Char</code>.</p>
+        <p>On a pair, <code>fst :: (a, b) -&gt; a</code> and <code>snd :: (a, b) -&gt; b</code>. <code>curry :: ((a, b) -&gt; c) -&gt; a -&gt; b -&gt; c</code> and <code>uncurry :: (a -&gt; b -&gt; c) -&gt; (a, b) -&gt; c</code> switch between a function on a pair and a curried function.</p>
+      </section>
+
+      <section id="features">
+        <h2>What the design buys</h2>
+        <ul>
+          <li><strong>Referential transparency.</strong> A pure name can be replaced by its definition. Monads keep effects in the type, so the equations around them stay transparent.</li>
+          <li><strong>Polymorphism.</strong> One function can be reused at many types.</li>
+          <li><strong>Concurrency.</strong> Effects are explicit, so GHC can schedule work on lightweight threads. Garbage collection is built in, and the collector can run in parallel.</li>
+        </ul>
+
+        <h3>Demand only what you use</h3>
+        <p><code>take n (map square [1..len])</code> runs <code>square</code> for the elements <code>take</code> asks for. Building the whole mapped list and then keeping a prefix does the extra work.</p>
+        <div class="controls">
+          <label>Elements demanded <input id="demand" type="range" min="0" max="12" value="3"></label>
+          <label>Source length <input id="sourcelen" type="range" min="1" max="24" value="10"></label>
+        </div>
+        <div class="lazy-grid">
+          <div class="panel">
+            <h3>Haskell</h3>
+            <p class="work" id="lazy-work">3</p>
+            <p id="lazy-caption">squares forced</p>
+            <div class="cells" id="lazy-cells"></div>
+          </div>
+          <div class="panel">
+            <h3>Map the whole list, then take</h3>
+            <p class="work" id="eager-work">10</p>
+            <p id="eager-caption">squares forced</p>
+            <div class="cells" id="eager-cells"></div>
+          </div>
+        </div>
+        <p>An argument that nobody uses is never run. A function can return a useful result without demanding that argument.</p>
+        <div class="grid-2">
+          <article class="demand">
+            <h3>The unused argument is not evaluated</h3>
+            <pre><code data-lang="haskell" id="demo-unused">foo n = n * n
+always x y = x
+always 4 (foo 10)</code></pre>
+            <button type="button" data-demo="unused">Run</button>
+            <pre class="console" id="out-unused" aria-live="polite">Press Run.</pre>
+          </article>
+          <article class="demand">
+            <h3>A used thunk is shared</h3>
+            <pre><code data-lang="haskell" id="demo-share">foo n = n * n
+double x = x + x
+double (foo 10)</code></pre>
+            <button type="button" data-demo="share">Run</button>
+            <pre class="console" id="out-share" aria-live="polite">Press Run.</pre>
+          </article>
+          <article class="demand">
+            <h3><code>length</code> does not force elements</h3>
+            <pre><code data-lang="haskell" id="demo-len">foo n = n * n
+length (map foo [1..40])</code></pre>
+            <div class="controls">
+              <button type="button" data-demo="len">Run length</button>
+              <button type="button" data-demo="take3">Run take 3</button>
+            </div>
+            <pre class="console" id="out-len" aria-live="polite">Press Run.</pre>
+          </article>
+          <article class="demand">
+            <h3>Where laziness costs</h3>
+            <pre><code data-lang="haskell" id="demo-fold">plus a b = a + b
+foldl plus 0 [1..12]</code></pre>
+            <div class="controls">
+              <button type="button" data-demo="foldl">Run foldl</button>
+              <button type="button" data-demo="foldl'">Run foldl'</button>
+            </div>
+            <pre class="console" id="out-fold" aria-live="polite">Press Run.</pre>
+            <p class="note">Both totals are 78. <code>foldl</code> builds the tower <code>((0+1)+2)+...</code> and adds only when the result is demanded. <code>foldl'</code> from <code>Data.List</code> keeps a number.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="design">
+        <h2>Five ways to write a function</h2>
+        <p>A function can be passed, returned, or stored. Work runs only when something demands the result, so there is no loop and no mutable variable.</p>
+
+        <article class="studio-card">
+          <h3>Pattern matching</h3>
+          <div class="studio-code">
+            <pre><code data-lang="haskell">sumList :: [Int] -&gt; Int
+sumList []     = 0
+sumList (x:xs) = x + sumList xs</code></pre>
+            <p id="sum-note" class="note">The (x:xs) equation peels one element at a time until [] returns 0.</p>
+          </div>
+          <div class="studio-result">
+            <pre class="console" id="sum-out">ghci&gt; sumList [1,2,3,4]
+10
+it :: Int</pre>
+            <div class="controls">
+              <label>List <input id="sum-list" type="text" value="1 2 3 4"></label>
+            </div>
+          </div>
+        </article>
+
+        <article class="studio-card">
+          <h3>Guards</h3>
+          <div class="studio-code">
+            <pre><code data-lang="haskell">factorial :: Integer -&gt; Integer
+factorial n
+  | n &lt;= 1    = 1
+  | otherwise = n * factorial (n - 1)</code></pre>
+            <p id="fact-note" class="note">Guards run from top to bottom. 5 fails n &lt;= 1, so otherwise multiplies down to 1.</p>
+          </div>
+          <div class="studio-result">
+            <pre class="console" id="fact-out">ghci&gt; factorial 5
+120
+it :: Integer</pre>
+            <div class="controls">
+              <label>n <input id="fact-n" type="number" value="5"></label>
+            </div>
+          </div>
+        </article>
+
+        <article class="studio-card">
+          <h3>Where clause</h3>
+          <div class="studio-code">
+            <pre><code data-lang="haskell">quadraticRoots :: Float -&gt; Float -&gt; Float -&gt; (Float, Float)
+quadraticRoots a b c = (root1, root2)
+  where
+    root1 = (-b + sqrt discriminant) / (2 * a)
+    root2 = (-b - sqrt discriminant) / (2 * a)
+    discriminant = b * b - 4 * a * c</code></pre>
+            <p id="quad-note" class="note">For 1, -3, 2 the discriminant is 1. The roots are 2 and 1. root1 and root2 are local to this equation.</p>
+          </div>
+          <div class="studio-result">
+            <pre class="console" id="quad-out">ghci&gt; quadraticRoots 1 -3 2
+(2.0,1.0)
+it :: (Float, Float)</pre>
+            <div class="controls">
+              <label>a <input id="quad-a" type="number" value="1" step="0.1"></label>
+              <label>b <input id="quad-b" type="number" value="-3" step="0.1"></label>
+              <label>c <input id="quad-c" type="number" value="2" step="0.1"></label>
+            </div>
+          </div>
+        </article>
+
+        <article class="studio-card">
+          <h3>Recursion instead of iteration</h3>
+          <div class="studio-code">
+            <pre><code data-lang="haskell">fibonacci :: Int -&gt; Int
+fibonacci 0 = 0
+fibonacci 1 = 1
+fibonacci n = fibonacci (n - 1) + fibonacci (n - 2)</code></pre>
+            <p id="fib-note" class="note">fibonacci 6 is fibonacci 5 plus fibonacci 4. The two calls repeat work a loop would save.</p>
+          </div>
+          <div class="studio-result">
+            <pre class="console" id="fib-out">ghci&gt; fibonacci 6
+8
+it :: Int</pre>
+            <div class="controls">
+              <label>n <input id="fib-n" type="number" value="6"></label>
+            </div>
+          </div>
+        </article>
+
+        <article class="studio-card">
+          <h3>Lambda</h3>
+          <div class="studio-code">
+            <pre><code data-lang="haskell">incrementList :: [Int] -&gt; [Int]
+incrementList = map (\x -&gt; x + 1)</code></pre>
+            <p id="inc-note" class="note">The lambda is an unnamed function passed straight to map.</p>
+          </div>
+          <div class="studio-result">
+            <pre class="console" id="inc-out">ghci&gt; incrementList [1,2,3]
+[2,3,4]
+it :: [Int]</pre>
+            <div class="controls">
+              <label>List <input id="inc-list" type="text" value="1 2 3"></label>
+            </div>
+          </div>
+        </article>
+
+        </section>
+
+      <section id="curry">
+        <h2>Returning a function</h2>
+        <p><code>add</code> looks like two arguments. The type <code>Integer -&gt; Integer -&gt; Integer</code> is <code>Integer -&gt; (Integer -&gt; Integer)</code>: one argument comes back as a function waiting for the next. <code>curry</code> and <code>uncurry</code> switch between this form and a function on a pair.</p>
+        <div class="controls">
+          <label>First argument <input id="cur-x" type="number" value="2"></label>
+          <label>Second argument <input id="cur-y" type="number" value="5"></label>
+          <button type="button" id="cur-apply">Apply next argument</button>
+          <button type="button" id="cur-reset">Reset</button>
+        </div>
+        <div id="curry-view"></div>
+
+        </section>
+
+      <section id="examples">
+        <h2>Programs, inputs, and outputs</h2>
+        <p>A finished program has a <code>main</code> of type <code>IO ()</code>.</p>
+
+        <article class="studio-card">
+          <h3>Printing a message</h3>
+          <div class="studio-code">
+            <pre><code data-lang="haskell">main :: IO ()
+main = putStrLn "Hello World!"</code></pre>
+            <p id="hello-note" class="note">putStrLn prints the string and a newline. The type of main stays IO ().</p>
+          </div>
+          <div class="studio-result">
+            <pre class="console" id="hello-out">Hello World!</pre>
+            <div class="controls">
+              <label>String <input id="hello-msg" type="text" value="Hello World!" size="28"></label>
+            </div>
+          </div>
+        </article>
+
+        <article class="studio-card">
+          <h3>Calling a function from main</h3>
+          <div class="studio-code">
+            <pre><code data-lang="haskell">add :: Integer -&gt; Integer -&gt; Integer
+add x y = x + y
+
+main = do
+  putStrLn "The sum of the two numbers is:"
+  print (add 2 5)</code></pre>
+            <p id="add-note" class="note">add 2 5 = 7. The addition is pure. main is IO because it prints.</p>
+          </div>
+          <div class="studio-result">
+            <pre class="console" id="add-out">The sum of the two numbers is:
+7</pre>
+            <div class="controls">
+              <label>x <input id="add-x" type="number" value="2"></label>
+              <label>y <input id="add-y" type="number" value="5"></label>
+            </div>
+          </div>
+        </article>
+
+        <article class="studio-card">
+          <h3>Quicksort by list comprehension</h3>
+          <div class="studio-code">
+            <pre><code data-lang="haskell">quicksort :: Ord a =&gt; [a] -&gt; [a]
+quicksort [] = []
+quicksort (x:xs) =
+  quicksort [a | a &lt;- xs, a &lt;= x]
+  ++ [x] ++
+  quicksort [a | a &lt;- xs, a &gt; x]</code></pre>
+            <p>The imperative sort walks indexes and swaps cells. This one names the pivot, the values that belong before it, and the values that belong after it. Each side is the same function on a shorter list. The empty list is the base case.</p>
+            <p id="sort-note" class="note">The first pivot is 4. Smaller or equal: [1,3,2]. Larger: []. Each side is sorted by the same equation.</p>
+          </div>
+          <div class="studio-result">
+            <pre class="console" id="sort-out">ghci&gt; quicksort [4,1,3,2]
+[1,2,3,4]
+it :: [Int]</pre>
+            <div class="controls">
+              <label>List <input id="sort-list" type="text" value="4 1 3 2"></label>
+            </div>
+          </div>
+        </article>
+
+        <article class="studio-card">
+          <h3>Function composition</h3>
+          <div class="studio-code">
+            <pre><code data-lang="haskell">eveno :: Int -&gt; Bool
+noto  :: Bool -&gt; String
+
+eveno x = if x `rem` 2 == 0
+            then True
+            else False
+
+noto x = if x == True
+           then "This is an even Number"
+           else "This is an ODD number"
+
+main = do
+  putStrLn "Example of Haskell Function composition"
+  print ((noto . eveno) 16)</code></pre>
+            <p id="comp-note" class="note">eveno 16 is True. noto turns that into the even-number string. The dot applies eveno first.</p>
+          </div>
+          <div class="studio-result">
+            <pre class="console" id="comp-out">ghci&gt; (noto . eveno) 16
+"This is an even Number"
+it :: String</pre>
+            <div class="controls">
+              <label>n <input id="comp-n" type="number" value="16"></label>
+            </div>
+          </div>
+        </article>
+
+        <article id="zipper">
+          <h3>A zipper points at one place</h3>
+          <p>The focus is the cell you edit. The rest is the path back, so one change does not start over from the root. On a list, the left side is stored reversed and the nearest neighbor is the head.</p>
+          <pre><code data-lang="haskell">type Zipper a = ([a], a, [a])
+
+goRight :: Zipper a -&gt; Zipper a
+goRight (ls, f, r:rs) = (f:ls, r, rs)
+
+goLeft :: Zipper a -&gt; Zipper a
+goLeft (l:ls, f, rs) = (ls, l, f:rs)
+
+replace :: a -&gt; Zipper a -&gt; Zipper a
+replace x (ls, _, rs) = (ls, x, rs)</code></pre>
+          <div class="controls">
+            <button type="button" id="zip-left">Move left</button>
+            <button type="button" id="zip-right">Move right</button>
+            <label>New focus <input id="zip-val" type="number" value="9"></label>
+            <button type="button" id="zip-set">Replace focus</button>
+          </div>
+          <div class="cells" id="zip-view"></div>
+          <p id="zip-note" class="note">The focus starts on 1.</p>
+          <p class="note"><code>goRight</code> and <code>goLeft</code> do not cover an empty side.</p>
+        </article>
+      </section>
+
+      <section id="sandbox">
+        <h2>Run the same ideas in the browser</h2>
+        <p>Try what you have already seen on this page, or change it and press Run. Load a preset to see how a different program is written and how it runs.</p>
+        <p>Names include <code>map</code>, <code>filter</code>, <code>take</code>, <code>drop</code>, <code>sum</code>, <code>product</code>, <code>length</code>, <code>reverse</code>, <code>head</code>, <code>tail</code>, <code>null</code>, <code>even</code>, <code>odd</code>, <code>div</code>, <code>mod</code>, <code>rem</code>, <code>foldr</code>, <code>foldl</code>, <code>foldl'</code>, <code>Just</code>, <code>Nothing</code>, <code>maybe</code>, <code>show</code>, and <code>elem</code>. Integer division is <code>div</code>, not <code>/</code>.</p>
+        <p class="note">This interpreter is not GHC.</p>
+        <div class="sandbox">
+          <div class="controls">
+            <label>Load a preset
+              <select id="preset" aria-label="Sandbox preset"></select>
+            </label>
+            <button type="button" id="load-preset">Load</button>
+            <button type="button" class="primary" id="run">Run</button>
+          </div>
+          <pre class="console" id="sandbox-out" aria-live="polite">Press Run.</pre>
+          <div class="chips" id="sandbox-log"></div>
+          <textarea id="source" spellcheck="false" aria-label="Haskell subset program">eveno x = if rem x 2 == 0 then True else False
+noto x = if x == True then "This is an even Number" else "This is an ODD number"
+(noto . eveno) 16</textarea>
+        </div>
+        <noscript><p class="callout warn">The input widgets and the sandbox need JavaScript. The Haskell and the sample outputs are still on the page.</p></noscript>
+      </section>
+
+      <section id="group">
+        <h2>Group sites and the paper</h2>
+        <p>Want to learn more about Haskell? Read more about it <a data-paper href="https://drive.google.com/drive/folders/1ZQeTZFPqxqp_o-ASNNVVfVjlWMM9LJ6w?usp=sharing" target="_blank" rel="noopener noreferrer">here</a></p>
+        <ul class="members" id="member-list">
+          <li><a class="here" href="./"><strong>Gabriel Salvador</strong> Haskell · this site</a></li>
+        </ul>
+      </section>
+
+      <footer>
+        <p>CSCI 202 final project.</p>
+      </footer>
+    </main>
+  </div>
+  <script src="js/config.js?v=7"></script>
+  <script src="js/highlight.js?v=4"></script>
+  <script src="js/sandbox.js?v=5"></script>
+  <script src="js/main.js?v=10"></script>
+</body>
+</html>
