@@ -17,13 +17,13 @@ window.SITE_CONFIG = {
     },
     {
       name: "Kristine Banzon",
-      role: "Content Communicator & Media Designer",
+      role: "Content Communicator & Research Lead",
       href: "https://kristine-banzon.github.io",
       here: false
     },
     {
       name: "Giuliana Bautista",
-      role: "Lead Researcher & LaTeX Lead",
+      role: "LaTeX Lead & Researcher",
       href: "https://giulianabautista.github.io",
       here: false
     }
