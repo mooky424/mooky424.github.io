@@ -134,11 +134,19 @@
     sections.forEach(function (section) { observer.observe(section); });
   }
 
+  function memberUrl(href) {
+    if (!href) return "./";
+    if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.charAt(0) === "/" || href.charAt(0) === "#" || href.charAt(0) === ".") return href;
+    return "https://" + href;
+  }
+
   function applyConfig() {
     var config = window.SITE_CONFIG || {};
     var byline = document.getElementById("byline");
-    if (byline && config.author) {
-      byline.textContent = (config.course || "CSCI 202") + " · " + (config.project || "Final project") + " · " + config.author;
+    if (byline) {
+      var names = (config.members || []).map(function (member) { return member.name; }).filter(Boolean);
+      var credit = [config.course || "CSCI 202"].concat(names.length ? names : (config.author ? [config.author] : []));
+      byline.textContent = credit.join(" · ");
     }
     if (config.paperHref) {
       var external = /^https?:/i.test(config.paperHref);
@@ -162,7 +170,7 @@
     config.members.forEach(function (member) {
       var item = document.createElement("li");
       var link = document.createElement("a");
-      link.href = member.href || "./";
+      link.href = memberUrl(member.href);
       if (member.here) {
         link.className = "here";
         link.setAttribute("aria-current", "page");
