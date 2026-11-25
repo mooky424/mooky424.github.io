@@ -7,7 +7,7 @@ window.SITE_CONFIG = {
   project: "Final Project",
   language: "Haskell",
   paperHref: "https://drive.google.com/drive/folders/1ZQeTZFPqxqp_o-ASNNVVfVjlWMM9LJ6w?usp=sharing",
-  paperLabel: "Download the LaTeX paper (PDF)",
+  paperLabel: "Download the paper (PDF)",
   members: [
     {
       name: "Gabriel Salvador",
