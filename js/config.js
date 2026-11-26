@@ -11,9 +11,9 @@ window.SITE_CONFIG = {
   members: [
     {
       name: "Gabriel Salvador",
-      here: true,
       role: "Technical Lead & Web Lead",
-      href: "https://mooky424.github.io"
+      href: "https://mooky424.github.io",
+      here: true
     },
     {
       name: "Kristine Banzon",
