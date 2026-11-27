@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>B-trees vs. LSM-trees: The backbone of modern storage engines</title>
+  <meta name="description" content="A comparative review of B-trees and LSM-trees, two structures used inside modern storage engines.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%2316251e' width='32' height='32' rx='6'/%3E%3Crect x='6' y='7' width='20' height='6' rx='1.5' fill='%23f0a57a'/%3E%3Crect x='5' y='18' width='9' height='6' rx='1.5' fill='%239fddd2'/%3E%3Crect x='18' y='18' width='9' height='6' rx='1.5' fill='%239fddd2'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css?rev=17">
+  <script src="../js/config.js?v=8" defer></script>
+  <script src="engine.js?rev=5" defer></script>
+  <script src="tutorial.js?rev=21" defer></script>
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <div id="top"></div>
+  <nav class="site-switch" aria-label="Sites">
+    <a href="../">Haskell</a>
+    <a href="#top" aria-current="page">Trees</a>
+  </nav>
+  <div class="layout">
+    <nav class="toc" aria-label="On this page">
+      <a href="#intro">Introduction</a>
+      <a href="#trees" data-tab="btree">B-trees</a>
+      <a href="#trees" data-tab="lsm">LSM-trees</a>
+      <a href="#group">Group &amp; paper</a>
+      <a class="nav-pdf" href="https://drive.google.com/drive/folders/1mQBSDCkPAtA_RwKdYXa1msAhpHe9TSv-?usp=sharing" target="_blank" rel="noopener noreferrer">Paper PDF</a>
+    </nav>
+    <main id="content">
+    <section class="wrap" id="intro">
+      <p class="kicker" id="byline">CSCI 201 · Trees · Gabriel Salvador · Kristine Banzon · Giuliana Bautista</p>
+      <h1>B-trees vs. LSM-trees: The backbone of modern storage engines</h1>
+      <p class="deck">As modern data needs become more and more demanding, a focus on the efficiency of storing and searching through data storage becomes critical. In this comparative review, we will be looking at two of the most used data structures in modern storage engines, namely B-trees and LSM-trees.</p>
+
+      <div class="table-scroll">
+        <table>
+          <caption>The interface and the tree are separate choices.</caption>
+          <thead>
+            <tr>
+              <th scope="col">System</th>
+              <th scope="col">SQL / NoSQL</th>
+              <th scope="col">Tree</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">PostgreSQL</th>
+              <td>SQL</td>
+              <td>B-tree</td>
+            </tr>
+            <tr>
+              <th scope="row">InnoDB</th>
+              <td>SQL</td>
+              <td>B-tree</td>
+            </tr>
+            <tr>
+              <th scope="row">SQLite</th>
+              <td>SQL</td>
+              <td>B-tree</td>
+            </tr>
+            <tr>
+              <th scope="row">MongoDB</th>
+              <td>NoSQL</td>
+              <td>B-tree</td>
+            </tr>
+            <tr>
+              <th scope="row">Cassandra</th>
+              <td>NoSQL</td>
+              <td>LSM-tree</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>How they differ</h2>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Aspect</th>
+              <th scope="col">B-tree</th>
+              <th scope="col">LSM-tree</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Primary strength</th>
+              <td>Stores multiple keys in a single node to efficiently store and retrieve keys from external storage</td>
+              <td>Buffers writes in memory and flushes sequentially for high write throughput</td>
+            </tr>
+            <tr>
+              <th scope="row">Tradeoffs</th>
+              <td>In-place updates can cause random I/O and higher write overhead</td>
+              <td>May require reading multiple files to find a specific key (especially if the key is old)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="wrap wide" id="trees">
+      <div class="tabs" role="tablist" aria-label="Structure">
+        <button type="button" id="tab-btree" role="tab" aria-selected="true" aria-controls="panel-btree">B-trees</button>
+        <button type="button" id="tab-lsm" role="tab" aria-selected="false" aria-controls="panel-lsm">LSM-trees</button>
+      </div>
+
+      <div id="panel-btree" role="tabpanel" aria-labelledby="tab-btree">
+        <h2>B-trees</h2>
+        <p class="deck">A B-tree is a type of self-balancing tree data structure that leverages how external storage devices (like disk drives) store data in large chunks. Different from a regular BST, a B-tree allows for more than one key per node and more than two children per node.</p>
+
+        <figure class="disk-figure">
+          <div class="disk-pair">
+            <div>
+              <p class="pair-label">Standard BST</p>
+              <svg class="platter" viewBox="0 0 240 240" role="img" aria-label="Four keys, each stored in a different sector of a disk">
+                <path class="slice" d="M120 120 L68 29.9 A104 104 0 0 1 172 29.9 Z"/>
+                <path class="slice" d="M120 120 L172 29.9 A104 104 0 0 1 224 120 Z"/>
+                <path class="slice" d="M120 120 L224 120 A104 104 0 0 1 172 210.1 Z"/>
+                <path class="slice" d="M120 120 L172 210.1 A104 104 0 0 1 68 210.1 Z"/>
+                <path class="slice" d="M120 120 L68 210.1 A104 104 0 0 1 16 120 Z"/>
+                <path class="slice" d="M120 120 L16 120 A104 104 0 0 1 68 29.9 Z"/>
+                <circle class="hub" cx="120" cy="120" r="36"/>
+                <text x="120" y="50">20</text>
+                <text x="184" y="157">4</text>
+                <text x="56" y="157">14</text>
+                <text x="56" y="83">8</text>
+              </svg>
+              <p class="node-caption">One key in each sector.</p>
+            </div>
+            <div>
+              <p class="pair-label">B-tree</p>
+              <svg class="platter" viewBox="0 0 240 240" role="img" aria-label="The same four keys stored together in one sector">
+                <path class="slice hot" d="M120 120 L68 29.9 A104 104 0 0 1 172 29.9 Z"/>
+                <path class="slice" d="M120 120 L172 29.9 A104 104 0 0 1 224 120 Z"/>
+                <path class="slice" d="M120 120 L224 120 A104 104 0 0 1 172 210.1 Z"/>
+                <path class="slice" d="M120 120 L172 210.1 A104 104 0 0 1 68 210.1 Z"/>
+                <path class="slice" d="M120 120 L68 210.1 A104 104 0 0 1 16 120 Z"/>
+                <path class="slice" d="M120 120 L16 120 A104 104 0 0 1 68 29.9 Z"/>
+                <circle class="hub" cx="120" cy="120" r="36"/>
+                <text x="120" y="42">4  8</text>
+                <text x="120" y="62">14  20</text>
+              </svg>
+              <p class="node-caption">Several keys share a sector.</p>
+            </div>
+          </div>
+        </figure>
+
+        <div class="with-tree">
+        <figure class="build">
+          <div class="diagram-tree" aria-hidden="true">
+            <div class="dt-node">
+              <p class="node-caption">root node</p>
+              <div class="node"><span>10</span><span>20</span></div>
+              <ul class="dt-kids">
+                <li>
+                  <div class="node"><span>4</span><span>8</span></div>
+                  <p class="node-caption">keys &lt; 10</p>
+                </li>
+                <li>
+                  <div class="node"><span>14</span></div>
+                  <p class="node-caption">10 &lt; keys &lt; 20</p>
+                </li>
+                <li>
+                  <div class="node"><span>25</span><span>30</span></div>
+                  <p class="node-caption">keys &gt; 20</p>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <figcaption>10 and 20 split the keys into three groups. A search reads one node per step. A write changes the node that holds the key.</figcaption>
+        </figure>
+
+        <div>
+          <h3>Properties</h3>
+          <p>A B-tree of order m is a search tree whose nodes have at most m children, and each node has at most m-1 keys</p>
+          <ol class="rules">
+            <li>Every leaf is at the same depth.</li>
+            <li>Keys in each node are sorted in ascending order (relevant for searching the tree).</li>
+            <li>All nodes (except root) have at least m/2 - 1 keys and m/2 children.</li>
+            <li>The root holds at least one key. If it is the only node, it has no children. If it has children, it has at least two.</li>
+          </ol>
+        </div>
+        </div>
+
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Operation</th>
+                <th scope="col">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Search</th>
+                <td>O(log n)</td>
+              </tr>
+              <tr>
+                <th scope="row">Insert</th>
+                <td>O(log n)</td>
+              </tr>
+              <tr>
+                <th scope="row">Delete</th>
+                <td>O(log n)</td>
+              </tr>
+              <tr>
+                <th scope="row">Traverse</th>
+                <td>O(n)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="B-tree operation">
+          <button type="button" id="op-tab-search" role="tab" aria-selected="true" aria-controls="op-panel-search">Search</button>
+          <button type="button" id="op-tab-insert" role="tab" aria-selected="false" aria-controls="op-panel-insert">Insert</button>
+          <button type="button" id="op-tab-delete" role="tab" aria-selected="false" aria-controls="op-panel-delete">Delete</button>
+          <button type="button" id="op-tab-sandbox" role="tab" aria-selected="false" aria-controls="op-panel-sandbox">Sandbox</button>
+        </div>
+
+        <div id="op-panel-search" role="tabpanel" aria-labelledby="op-tab-search">
+          <ol class="rules">
+            <li>Start at the root and walk down.</li>
+            <li>If the node contains the key, stop. That is the node.</li>
+            <li>If not, compare the key with the sorted keys and choose a child.
+              <ul>
+                <li>Smaller than every key: the leftmost child.</li>
+                <li>Larger than every key: the rightmost child.</li>
+                <li>Between two keys: the child between them.</li>
+              </ul>
+            </li>
+            <li>Repeat until the key is found, or the node has no children.</li>
+          </ol>
+
+          <div class="stage" id="stage">
+            <div class="tree-scroll">
+              <svg id="tree" role="img" aria-label="B-tree search"></svg>
+              <div class="player">
+                <button type="button" id="prev" class="icon-btn" aria-label="Previous"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg></button>
+                <button type="button" id="play" class="icon-btn play" aria-label="Play"><svg class="icon icon-play" viewBox="0 0 24 24" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg><svg class="icon icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></button>
+                <button type="button" id="next" class="icon-btn" aria-label="Next"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg></button>
+                <p class="frame-count" id="count"></p>
+              </div>
+            </div>
+            <div class="readout">
+              <p class="transcript" id="text" aria-live="polite"></p>
+            </div>
+            <ul class="legend">
+              <li><i class="swatch path"></i> Node we're in</li>
+              <li><i class="swatch hot"></i> Key that moved</li>
+              <li><i class="swatch full"></i> Full, or almost empty</li>
+              <li><i class="swatch miss"></i> Not here</li>
+            </ul>
+          </div>
+        </div>
+
+        <div id="op-panel-insert" role="tabpanel" aria-labelledby="op-tab-insert" hidden>
+          <ol class="rules">
+            <li>Walk the tree to the place the new key belongs.</li>
+            <li>Then one of three cases.
+              <ol>
+                <li>The node has room.
+                  <ul>
+                    <li>Insert the key in the node.</li>
+                  </ul>
+                </li>
+                <li>The node is full, but the parent has room.
+                  <ul>
+                    <li>Add the new key into the node.</li>
+                    <li>Split the node around the middle key.</li>
+                    <li>Move the middle key into the parent.</li>
+                    <li>Keys smaller than the middle key stay in the left child.</li>
+                    <li>Keys larger than the middle key go in a new right child.</li>
+                  </ul>
+                </li>
+                <li>The leaf and its parent are both full.
+                  <ul>
+                    <li>Repeat the split upward until a node has room.</li>
+                  </ul>
+                </li>
+              </ol>
+            </li>
+          </ol>
+          <div class="stage" id="ins-stage">
+            <div class="scenes" id="ins-scenes"></div>
+            <div class="tree-scroll">
+              <svg id="ins-tree" role="img" aria-label="B-tree insert"></svg>
+              <div class="player">
+                <button type="button" id="ins-prev" class="icon-btn" aria-label="Previous"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg></button>
+                <button type="button" id="ins-play" class="icon-btn play" aria-label="Play"><svg class="icon icon-play" viewBox="0 0 24 24" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg><svg class="icon icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></button>
+                <button type="button" id="ins-next" class="icon-btn" aria-label="Next"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg></button>
+                <p class="frame-count" id="ins-count"></p>
+              </div>
+            </div>
+            <div class="readout">
+              <p class="transcript" id="ins-text" aria-live="polite"></p>
+            </div>
+            <ul class="legend">
+              <li><i class="swatch path"></i> Node we're in</li>
+              <li><i class="swatch hot"></i> Key that moved</li>
+              <li><i class="swatch full"></i> Full, or almost empty</li>
+              <li><i class="swatch miss"></i> Not here</li>
+            </ul>
+          </div>
+        </div>
+
+        <div id="op-panel-delete" role="tabpanel" aria-labelledby="op-tab-delete" hidden>
+          <ol class="rules">
+            <li>If the key is in a leaf, remove it.</li>
+            <li>If the key is in an internal node, do one of three things.
+              <ol>
+                <li>The left child has at least m/2 keys.
+                  <ul>
+                    <li>Swap the key with the greatest key to its left, then remove that copy below.</li>
+                  </ul>
+                </li>
+                <li>Otherwise, if the right child has at least m/2 keys.
+                  <ul>
+                    <li>Swap the key with the smallest key to its right, then remove that copy below.</li>
+                  </ul>
+                </li>
+                <li>Both children have only m/2 - 1 keys.
+                  <ul>
+                    <li>Merge the two children.</li>
+                    <li>Move the key down between them.</li>
+                    <li>Remove it from the merged node.</li>
+                  </ul>
+                </li>
+              </ol>
+            </li>
+            <li>If the key is farther down, do not enter a child that has only m/2 - 1 keys. Fix it first.
+              <ol>
+                <li>A sibling has at least m/2 keys: borrow. A key from the sibling moves up into the parent, and the parent key between them moves down.</li>
+                <li>Both immediate siblings have only m/2 - 1 keys: merge the child with one sibling. The parent key between them comes down.</li>
+              </ol>
+            </li>
+            <li>If the root is left with no keys, drop it. Its only child becomes the new root, and the tree gets shorter.</li>
+          </ol>
+          <div class="stage" id="del-stage">
+            <div class="scenes" id="del-scenes"></div>
+            <div class="tree-scroll">
+              <svg id="del-tree" role="img" aria-label="B-tree delete"></svg>
+              <div class="player">
+                <button type="button" id="del-prev" class="icon-btn" aria-label="Previous"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg></button>
+                <button type="button" id="del-play" class="icon-btn play" aria-label="Play"><svg class="icon icon-play" viewBox="0 0 24 24" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg><svg class="icon icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></button>
+                <button type="button" id="del-next" class="icon-btn" aria-label="Next"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg></button>
+                <p class="frame-count" id="del-count"></p>
+              </div>
+            </div>
+            <div class="readout">
+              <p class="transcript" id="del-text" aria-live="polite"></p>
+            </div>
+            <ul class="legend">
+              <li><i class="swatch path"></i> Node we're in</li>
+              <li><i class="swatch hot"></i> Key that moved</li>
+              <li><i class="swatch full"></i> Full, or almost empty</li>
+              <li><i class="swatch miss"></i> Not here</li>
+            </ul>
+          </div>
+        </div>
+
+        <div id="op-panel-sandbox" role="tabpanel" aria-labelledby="op-tab-sandbox" hidden>
+          <p>Set the order, then add keys. Add uses the next whole number. Random uses one that is not stored yet.</p>
+          <div class="stage" id="box-stage">
+            <div class="lab-controls">
+              <label>Order m
+                <input id="box-m" type="number" min="4" max="12" step="2" value="4">
+              </label>
+              <button type="button" id="box-add" class="btn green">Add 1</button>
+              <button type="button" id="box-random" class="btn">Add random</button>
+              <label>Key
+                <input id="box-key" type="number" min="0" max="999" inputmode="numeric">
+              </label>
+              <button type="button" id="box-insert" class="btn">Insert</button>
+              <button type="button" id="box-search" class="btn">Search</button>
+              <button type="button" id="box-delete" class="btn">Delete</button>
+              <button type="button" id="box-reset" class="btn ghost">Reset</button>
+            </div>
+            <div class="tree-scroll">
+              <svg id="box-tree" role="img" aria-label="B-tree sandbox"></svg>
+              <div class="player">
+                <button type="button" id="box-prev" class="icon-btn" aria-label="Previous"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg></button>
+                <button type="button" id="box-play" class="icon-btn play" aria-label="Play"><svg class="icon icon-play" viewBox="0 0 24 24" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg><svg class="icon icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></button>
+                <button type="button" id="box-next" class="icon-btn" aria-label="Next"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg></button>
+                <p class="frame-count" id="box-count"></p>
+              </div>
+            </div>
+            <div class="readout">
+              <p class="transcript" id="box-text" aria-live="polite"></p>
+            </div>
+            <ul class="legend">
+              <li><i class="swatch path"></i> Node we're in</li>
+              <li><i class="swatch hot"></i> Key that moved</li>
+              <li><i class="swatch full"></i> Full, or almost empty</li>
+              <li><i class="swatch miss"></i> Not here</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div id="panel-lsm" role="tabpanel" aria-labelledby="tab-lsm" hidden>
+        <h2>LSM-trees</h2>
+        <p class="deck">An LSM-tree (Log-Structured Merge-tree) is a write-optimized data structure that turns random disk writes into fast, sequential writes by buffering changes in memory and flushing them to disk as immutable sorted files. Different from a B-tree, which updates records in place on disk, an LSM-tree appends and merges sorted runs in the background.</p>
+
+        <div class="with-tree lsm-layout">
+          <div>
+            <h3>Properties</h3>
+            <p>An LSM-tree is a multi-level data structure composed of a mutable in-memory buffer (C<sub>0</sub>) and a hierarchy of immutable, sorted on-disk components (C<sub>1</sub>, C<sub>2</sub>, …, C<sub>k</sub>) with an exponential size ratio T.</p>
+            <ol class="rules">
+              <li>Data is never modified or deleted in place on disk; all updates and deletes (tombstones) are appended as new entries.</li>
+              <li>Keys within the in-memory memtable and within each on-disk sorted run (SSTable) are maintained in ascending order.</li>
+              <li>Each disk level C<sub>i</sub> has a maximum capacity T times larger than the preceding level C<sub>i−1</sub> (where T is the size ratio or fanout).</li>
+              <li>Newer data resides in upper levels (memory and shallow disk levels), while older data migrates to deeper levels through background compaction.</li>
+              <li>Within any single disk level C<sub>i</sub> (i ≥ 1) in a standard leveled LSM-tree, SSTables hold strictly disjoint key ranges, though key ranges may overlap across different levels.</li>
+            </ol>
+          </div>
+          <figure class="build">
+            <div class="lsm-map" role="img" aria-label="A read request checks the memtable in memory, then the new SSTables on disk, then the compacted SSTables">
+              <p class="lsm-request">Read request</p>
+              <svg class="lsm-arrow" viewBox="0 0 28 16" aria-hidden="true"><path d="M1 8 H21 M15 3 L22 8 L15 13"/></svg>
+              <div class="lsm-band">
+                <span>Memory</span>
+                <p class="lsm-chip">Memtable</p>
+              </div>
+              <svg class="lsm-arrow down" viewBox="0 0 16 28" aria-hidden="true"><path d="M8 1 V21 M3 15 L8 22 L13 15"/></svg>
+              <div class="lsm-band disk">
+                <span>Disk</span>
+                <div class="lsm-level">
+                  <p class="lsm-level-name">New SSTables</p>
+                  <div class="lsm-tables">
+                    <p class="lsm-chip">SSTable</p>
+                    <p class="lsm-chip">SSTable</p>
+                  </div>
+                </div>
+                <div class="lsm-level compacted">
+                  <p class="lsm-level-name">Compacted</p>
+                  <div class="lsm-tables">
+                    <p class="lsm-chip">SSTable</p>
+                    <p class="lsm-chip">SSTable</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <figcaption>A read checks the memtable first. If the key is not there, it continues through the new SSTables, then the compacted ones.</figcaption>
+          </figure>
+        </div>
+
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Operation</th>
+                <th scope="col">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Search</th>
+                <td>O(log n)</td>
+              </tr>
+              <tr>
+                <th scope="row">Write</th>
+                <td>O(1)</td>
+              </tr>
+              <tr>
+                <th scope="row">Traverse</th>
+                <td>O(n)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="LSM-tree workflow">
+          <button type="button" id="lsm-tab-mem" role="tab" aria-selected="true" aria-controls="lsm-panel-mem">Memtable</button>
+          <button type="button" id="lsm-tab-flush" role="tab" aria-selected="false" aria-controls="lsm-panel-flush">Flush</button>
+          <button type="button" id="lsm-tab-compact" role="tab" aria-selected="false" aria-controls="lsm-panel-compact">Compaction</button>
+          <button type="button" id="lsm-tab-sandbox" role="tab" aria-selected="false" aria-controls="lsm-panel-sandbox">Sandbox</button>
+        </div>
+
+        <div id="lsm-panel-mem" role="tabpanel" aria-labelledby="lsm-tab-mem">
+          <p>Unlike B-trees, LSM-trees buffer recent writes in an in-memory data structure (such as a skip list or balanced search tree) before writing them to disk. Keeping recent keys sorted in memory absorbs fast updates and makes the newest data quick to read without immediate disk I/O.</p>
+          <ol class="rules">
+            <li>A new key is written into memory, in sorted order. Older SSTables are not opened.</li>
+            <li>If that key is already in memory, its copy is replaced.</li>
+            <li>If an older SSTable has the key, the new copy goes in memory and the old one stays.</li>
+            <li>A delete is the same write, marked ×key. The older copy stays until compaction.</li>
+          </ol>
+          <div class="stage" id="lsm-stage">
+            <div class="scenes" id="lsm-mem-scenes"></div>
+            <div class="tree-scroll">
+              <svg id="lsm-tree" role="img" aria-label="LSM-tree search"></svg>
+              <div class="player">
+                <button type="button" id="lsm-prev" class="icon-btn" aria-label="Previous"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg></button>
+                <button type="button" id="lsm-play" class="icon-btn play" aria-label="Play"><svg class="icon icon-play" viewBox="0 0 24 24" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg><svg class="icon icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></button>
+                <button type="button" id="lsm-next" class="icon-btn" aria-label="Next"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg></button>
+                <p class="frame-count" id="lsm-count"></p>
+              </div>
+            </div>
+            <div class="readout">
+              <p class="transcript" id="lsm-text" aria-live="polite"></p>
+            </div>
+            <ul class="legend">
+              <li><i class="swatch path"></i> Table we're in</li>
+              <li><i class="swatch hot"></i> Key that moved</li>
+              <li><i class="swatch full"></i> Memory is full</li>
+              <li><i class="swatch miss"></i> Not here, or deleted</li>
+            </ul>
+          </div>
+        </div>
+
+        <div id="lsm-panel-flush" role="tabpanel" aria-labelledby="lsm-tab-flush" hidden>
+          <p>When the memtable reaches a configured size limit, it flushes to disk as a Sorted String Table. Flushing turns accumulated in-memory writes into durable, sorted on-disk data so memory can be reused.</p>
+          <ol class="rules">
+            <li>Memory holds only as many keys as its size limit.</li>
+            <li>The key that fills it is written in. Then the whole table is saved to disk as an SSTable, and memory is cleared.</li>
+            <li>If memory is already full, it is saved first. The new key starts the next table.</li>
+          </ol>
+          <div class="stage" id="lsm-ins-stage">
+            <div class="scenes" id="lsm-flush-scenes"></div>
+            <div class="tree-scroll">
+              <svg id="lsm-ins-tree" role="img" aria-label="LSM-tree insert"></svg>
+              <div class="player">
+                <button type="button" id="lsm-ins-prev" class="icon-btn" aria-label="Previous"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg></button>
+                <button type="button" id="lsm-ins-play" class="icon-btn play" aria-label="Play"><svg class="icon icon-play" viewBox="0 0 24 24" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg><svg class="icon icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></button>
+                <button type="button" id="lsm-ins-next" class="icon-btn" aria-label="Next"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg></button>
+                <p class="frame-count" id="lsm-ins-count"></p>
+              </div>
+            </div>
+            <div class="readout">
+              <p class="transcript" id="lsm-ins-text" aria-live="polite"></p>
+            </div>
+            <ul class="legend">
+              <li><i class="swatch path"></i> Table we're in</li>
+              <li><i class="swatch hot"></i> Key that moved</li>
+              <li><i class="swatch full"></i> Memory is full</li>
+              <li><i class="swatch miss"></i> Not here, or deleted</li>
+            </ul>
+          </div>
+        </div>
+
+        <div id="lsm-panel-compact" role="tabpanel" aria-labelledby="lsm-tab-compact" hidden>
+          <p>Compaction is a background process that reads multiple SSTables, merges their sorted entries, discards overwritten values and deleted markers (tombstones), and writes out new consolidated SSTables. This keeps the number of files manageable, reclaims disk space, and prevents read lookups from having to check too many overlapping files.</p>
+          <ol class="rules">
+            <li>C1 holds at most T times the memtable, where T is the size ratio.</li>
+            <li>A flush past that limit merges C1 into C2.</li>
+            <li>C2 holds T times C1. Past that, it merges into C3.</li>
+            <li>The newest copy of each key is kept. A ×key is dropped on the oldest level.</li>
+          </ol>
+          <div class="stage" id="lsm-del-stage">
+            <div class="scenes" id="lsm-compact-scenes"></div>
+            <div class="tree-scroll">
+              <svg id="lsm-del-tree" role="img" aria-label="LSM-tree delete"></svg>
+              <div class="player">
+                <button type="button" id="lsm-del-prev" class="icon-btn" aria-label="Previous"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg></button>
+                <button type="button" id="lsm-del-play" class="icon-btn play" aria-label="Play"><svg class="icon icon-play" viewBox="0 0 24 24" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg><svg class="icon icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></button>
+                <button type="button" id="lsm-del-next" class="icon-btn" aria-label="Next"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg></button>
+                <p class="frame-count" id="lsm-del-count"></p>
+              </div>
+            </div>
+            <div class="readout">
+              <p class="transcript" id="lsm-del-text" aria-live="polite"></p>
+            </div>
+            <ul class="legend">
+              <li><i class="swatch path"></i> Table we're in</li>
+              <li><i class="swatch hot"></i> Key that moved</li>
+              <li><i class="swatch full"></i> Memory is full</li>
+              <li><i class="swatch miss"></i> Not here, or deleted</li>
+            </ul>
+          </div>
+        </div>
+
+        <div id="lsm-panel-sandbox" role="tabpanel" aria-labelledby="lsm-tab-sandbox" hidden>
+          <p>Set how many keys the memtable holds, and the size ratio T. Each disk level holds T times the level above it. Add uses the next whole number. Random uses one that is not stored yet. ×key means deleted.</p>
+          <div class="stage" id="lsm-box-stage">
+            <div class="lab-controls">
+              <label>Memtable keys
+                <input id="lsm-box-mem" type="number" min="2" max="8" step="1" value="4">
+              </label>
+              <label>Size ratio T
+                <input id="lsm-box-runs" type="number" min="2" max="4" step="1" value="2">
+              </label>
+              <button type="button" id="lsm-box-add" class="btn green">Add 1</button>
+              <button type="button" id="lsm-box-random" class="btn">Add random</button>
+              <label>Key
+                <input id="lsm-box-key" type="number" min="0" max="999" inputmode="numeric">
+              </label>
+              <button type="button" id="lsm-box-insert" class="btn">Insert</button>
+              <button type="button" id="lsm-box-search" class="btn">Search</button>
+              <button type="button" id="lsm-box-delete" class="btn">Delete</button>
+              <button type="button" id="lsm-box-reset" class="btn ghost">Reset</button>
+            </div>
+            <div class="tree-scroll">
+              <svg id="lsm-box-tree" role="img" aria-label="LSM-tree sandbox"></svg>
+              <div class="player">
+                <button type="button" id="lsm-box-prev" class="icon-btn" aria-label="Previous"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg></button>
+                <button type="button" id="lsm-box-play" class="icon-btn play" aria-label="Play"><svg class="icon icon-play" viewBox="0 0 24 24" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg><svg class="icon icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></button>
+                <button type="button" id="lsm-box-next" class="icon-btn" aria-label="Next"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg></button>
+                <p class="frame-count" id="lsm-box-count"></p>
+              </div>
+            </div>
+            <div class="readout">
+              <p class="transcript" id="lsm-box-text" aria-live="polite"></p>
+            </div>
+            <ul class="legend">
+              <li><i class="swatch path"></i> Table we're in</li>
+              <li><i class="swatch hot"></i> Key that moved</li>
+              <li><i class="swatch full"></i> Memory is full</li>
+              <li><i class="swatch miss"></i> Not here, or deleted</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="wrap" id="group">
+      <h2>Group sites and the paper</h2>
+      <p>Want to learn more? Read the review <a href="https://drive.google.com/drive/folders/1mQBSDCkPAtA_RwKdYXa1msAhpHe9TSv-?usp=sharing" target="_blank" rel="noopener noreferrer">here</a>.</p>
+      <p><a class="button primary" href="https://drive.google.com/drive/folders/1mQBSDCkPAtA_RwKdYXa1msAhpHe9TSv-?usp=sharing" target="_blank" rel="noopener noreferrer">Download the review paper (PDF)</a></p>
+      <ul class="members" id="member-list">
+        <li><a class="here" href="../" aria-current="page"><strong>Gabriel Salvador</strong> Technical Lead &amp; Web Lead · this site</a></li>
+        <li><a href="https://kristine-banzon.github.io"><strong>Kristine Banzon</strong> Content Communicator &amp; Research Lead</a></li>
+        <li><a href="https://giulianabautista.github.io"><strong>Giuliana Bautista</strong> LaTeX Lead &amp; Researcher</a></li>
+      </ul>
+    </section>
+    <footer class="footer">
+      <p>CSCI 201 final project.</p>
+    </footer>
+  </main>
+  </div>
+</body>
+</html>

@@ -116,7 +116,7 @@
   }
 
   function spyNav() {
-    var links = Array.prototype.slice.call(document.querySelectorAll(".site-nav a[href^='#']"));
+    var links = Array.prototype.slice.call(document.querySelectorAll(".site-nav > a[href^='#']"));
     var sections = links.map(function (link) {
       return document.querySelector(link.getAttribute("href"));
     }).filter(Boolean);
