@@ -141,7 +141,24 @@ Nothing :: Maybe a</pre>
 
       <section id="ladder">
         <h2>The type-class ladder</h2>
-        <p>A class names an ability a type can have. <code>Eq</code>, <code>Ord</code>, and <code>Num</code> are the everyday ones on <code>Int</code> and <code>Char</code>: equality, order, and arithmetic. <code>Functor</code>, <code>Applicative</code>, and <code>Monad</code> are the other kind. Each one needs a type constructor such as the list constructor or <code>Maybe</code>, and <code>Int</code> has nothing for <code>fmap</code> to change.</p>
+        <p>In Haskell, a type class defines an ability a type can support.</p>
+
+        <h3>Type classes for concrete types</h3>
+        <p>Everyday type classes work on complete, standalone types like <a href="#type-int"><code>Int</code></a> or <a href="#type-char"><code>Char</code></a>:</p>
+        <ul>
+          <li><code>Eq</code> adds equality checks (<code>==</code>).</li>
+          <li><code>Ord</code> adds ordering comparisons (<code>&lt;</code>, <code>&gt;</code>).</li>
+          <li><code>Num</code> adds arithmetic (<code>+</code>, <code>*</code>).</li>
+        </ul>
+        <p><code>Int</code> is already a finished type. It holds a single number rather than wrapping another type inside it.</p>
+
+        <h3>Type classes for type constructors</h3>
+        <p><code>Functor</code>, <code>Applicative</code>, and <code>Monad</code> work differently: they apply to type constructors, which take another type to form a complete type, such as <a href="#type-maybe"><code>Maybe</code></a> (making <code>Maybe Int</code>) or lists (making <code>[Int]</code>).</p>
+        <p>Because these type classes transform or sequence values inside a context:</p>
+        <ul>
+          <li><code>Maybe</code> can be a <code>Functor</code>, because <code>fmap</code> reaches inside <code>Maybe Int</code> and updates the inner <code>Int</code>.</li>
+          <li><code>Int</code> cannot be a <code>Functor</code> on its own. It has no inner value for <code>fmap</code> to transform.</li>
+        </ul>
         <div class="ladder">
           <article>
             <h3>Functor</h3>
@@ -178,45 +195,78 @@ Nothing :: Maybe a</pre>
 
       <section id="monad">
         <h2>Monads</h2>
-        <p><code>add 2 5</code> is 7. A function that wants an <code>Int</code> can take that 7. <code>Just 3</code> is not an <code>Int</code>. Its type is <a href="#type-maybe"><code>Maybe Int</code></a>, the number or <code>Nothing</code>. <code>putStrLn "hi"</code> is not a string. It is a print that has not run yet. The next function still wants the plain value: the 3, or the <code>()</code> a print produces when it finishes.</p>
-        <p><code>return</code> wraps a plain value so the chain can start. For <code>Maybe</code>, <code>return 3</code> is <code>Just 3</code>. <code>&gt;&gt;=</code> takes the wrapper off and gives what was inside to the next function. That function has to return the same kind of wrapper: another <code>Maybe</code>, or another <code>IO</code>. <code>Nothing</code> has no number inside, so the next function is not called. An equation cannot print or change a variable on the side, so failure and printing are values of their own. That is why <code>main</code> has type <code>IO ()</code>, and why <code>add 2 5</code> stays an ordinary sum.</p>
+        <p>In Haskell, some values come with context attached, such as a value that might be missing (<code>Maybe</code>), or an action that talks to the outside world (<code>IO</code>). Monads give you a clean, consistent way to chain steps when each step produces one of these wrapped values.</p>
 
-        <h3>Maybe can stop</h3>
+        <h3>Plain values and wrapped values</h3>
+        <ul>
+          <li><strong>Plain value.</strong> <code>add 2 5</code> evaluates to <code>7</code>. Any function expecting an <code>Int</code> can use <code>7</code> right away.</li>
+          <li><strong>Possibly missing value.</strong> <code>Just 3</code> has type <a href="#type-maybe"><code>Maybe Int</code></a>, not <code>Int</code>. It holds <code>3</code>, or it might be <code>Nothing</code>.</li>
+          <li><strong>Pending I/O action.</strong> <code>putStrLn "hi"</code> has type <code>IO ()</code>, not <code>String</code>. It describes a printing action that runs when executed, yielding <code>()</code> once done. <code>()</code> is unit, an empty tuple that stands for no meaningful result.</li>
+        </ul>
+        <p>The core tension is simple: a step might return <code>Maybe a</code> or <code>IO a</code>, while the next step wants a plain <code>a</code> to work with.</p>
+
+        <h3>Wrapping and chaining</h3>
+        <p>Two operations make chaining work across monads:</p>
+        <ul>
+          <li><code>return</code> (or <code>pure</code>) puts a plain value into the monad's context. For <code>Maybe</code>, <code>return 3</code> gives <code>Just 3</code>.</li>
+          <li>Bind (<code>&gt;&gt;=</code>) takes a wrapped value, extracts the inner value if present, passes it to a function, and keeps the result in the same monad.</li>
+        </ul>
+        <p>With <code>Maybe</code>, <code>&gt;&gt;=</code> handles failure for you. If the left side is <code>Just 3</code>, the next function receives <code>3</code>. If the left side is <code>Nothing</code>, the next function is skipped and <code>Nothing</code> passes straight through.</p>
+
+        <h3>Stopping early with Maybe</h3>
+        <p>A function like <code>next</code> can take a plain <code>Int</code>, check a condition, and decide whether to keep going (<code>Just ...</code>) or stop (<code>Nothing</code>):</p>
         <pre><code data-lang="haskell">next :: Int -&gt; Maybe Int
 next x = if x &gt; 2 then Just (x * 10) else Nothing</code></pre>
-        <p><code>return</code> for <code>Maybe</code> is <code>Just</code>. <code>Just 3 &gt;&gt;= next</code> opens the <code>Just</code>, and <code>next</code> sees 3, so it returns <code>Just 30</code>. <code>Just 1 &gt;&gt;= next</code> opens the <code>Just</code> as well, and <code>next</code> returns <code>Nothing</code>. A starting <code>Nothing</code> never calls <code>next</code>.</p>
+        <p><code>&gt;&gt;=</code> chains a <code>Maybe</code> value into a function that returns a new <code>Maybe</code> value:</p>
+        <ul>
+          <li><code>Just 3 &gt;&gt;= next</code>. <code>&gt;&gt;=</code> unwraps <code>3</code> from <code>Just</code> and passes <code>3</code> to <code>next</code>. Since <code>3</code> is greater than <code>2</code>, <code>next</code> returns <code>Just 30</code>.</li>
+          <li><code>Just 1 &gt;&gt;= next</code>. <code>&gt;&gt;=</code> unwraps <code>1</code> and passes <code>1</code> to <code>next</code>. Since <code>1</code> is not greater than <code>2</code>, <code>next</code> stops and returns <code>Nothing</code>.</li>
+          <li><code>Nothing &gt;&gt;= next</code>. There is no number inside <code>Nothing</code>, so <code>&gt;&gt;=</code> skips <code>next</code> completely and returns <code>Nothing</code>.</li>
+        </ul>
+        <p>In <code>Maybe</code>, <code>return</code> (or <code>pure</code>) wraps a plain number in <code>Just</code>. For example, <code>return 3</code> is <code>Just 3</code>.</p>
         <div class="controls">
           <button type="button" data-ladder="bind-go">Run Just 3</button>
           <button type="button" data-ladder="bind-stop">Run Just 1</button>
+          <button type="button" data-ladder="bind-nothing">Run Nothing</button>
         </div>
         <pre class="console" id="monad-bind" aria-live="polite">Press Run.</pre>
 
-        <h3>The next step sees the value</h3>
-        <p><code>&lt;*&gt;</code> applies a function that is already sitting in the context. <code>&gt;&gt;=</code> builds the next context from the value it just unwrapped. <code>next</code> looks at the number and chooses <code>Just</code> or <code>Nothing</code>.</p>
+        <h3>The three monad laws</h3>
+        <p>Every monad must follow three rules so chains of steps behave predictably and can be refactored safely. The Kleisli composition operator (<code>&gt;=&gt;</code>) joins two monadic functions (<code>a -&gt; m b</code> and <code>b -&gt; m c</code>) into one combined function (<code>a -&gt; m c</code>): run the first function, then pass its result into the second using <code>&gt;&gt;=</code>.</p>
+        <pre><code data-lang="haskell">return &gt;=&gt; mf    = mf               -- Left identity
+mf &gt;=&gt; return    = mf               -- Right identity
+(f &gt;=&gt; g) &gt;=&gt; h  = f &gt;=&gt; (g &gt;=&gt; h)  -- Associativity</code></pre>
 
-        <h3>IO is the same pair of methods</h3>
-        <p><code>do</code> writes a chain of <code>&gt;&gt;=</code> as steps.</p>
-        <pre><code data-lang="haskell">main = do
-  putStrLn "The sum of the two numbers is:"
-  print (add 2 5)
-
--- the same steps
-putStrLn "The sum of the two numbers is:"
-  &gt;&gt;= \_ -&gt; print (add 2 5)</code></pre>
-        <p><code>putStrLn</code> produces <code>IO ()</code>. The lambda ignores that <code>()</code> and runs <code>print</code>. <code>add 2 5</code> stays a pure equation. The type of <code>main</code> is <code>IO ()</code>, so the printing stays in the type and the equations around it stay replaceable by their definitions.</p>
-
-        <h3>Three laws</h3>
-        <p><code>f &gt;=&gt; g</code> is the function that runs <code>f</code>, then binds <code>g</code>. Any monad has to obey these three equations, which is what lets a chain be replaced by the definitions of its steps:</p>
-        <pre><code data-lang="haskell">return &gt;=&gt; mf    = mf                 -- left identity
-mf &gt;=&gt; return    = mf                 -- right identity
-(f &gt;=&gt; g) &gt;=&gt; h  = f &gt;=&gt; (g &gt;=&gt; h)    -- associativity</code></pre>
-        <p>On <code>next</code>, left identity says <code>return 3 &gt;&gt;= next</code> equals <code>next 3</code>. Right identity says <code>Just 3 &gt;&gt;= return</code> equals <code>Just 3</code>. Associativity says the grouping does not matter: bind <code>next</code> and then <code>step</code>, where <code>step y = Just (y + 1)</code>, or bind the combined function.</p>
+        <h4>Left identity</h4>
+        <p>Wrapping a value with <code>return</code> and immediately passing it with <code>&gt;&gt;=</code> does the same thing as calling the function directly on that value:</p>
+        <pre><code data-lang="haskell">return 3 &gt;&gt;= next   -- same as: next 3  -&gt;  Just 30</code></pre>
         <div class="controls">
           <button type="button" data-ladder="law-left">Run left identity</button>
+        </div>
+        <pre class="console" id="monad-law-left" aria-live="polite">Press Run.</pre>
+
+        <h4>Right identity</h4>
+        <p>Passing a wrapped value into <code>return</code> gives back that exact wrapped value unchanged:</p>
+        <pre><code data-lang="haskell">Just 3 &gt;&gt;= return   -- gives: Just 3</code></pre>
+        <div class="controls">
           <button type="button" data-ladder="law-right">Run right identity</button>
+        </div>
+        <pre class="console" id="monad-law-right" aria-live="polite">Press Run.</pre>
+
+        <h4>Associativity</h4>
+        <p>Grouping chained steps in different ways produces the same result. <code>next</code> is defined above, and <code>step</code> adds 1 inside <code>Maybe</code>:</p>
+        <pre><code data-lang="haskell">step :: Int -&gt; Maybe Int
+step y = Just (y + 1)</code></pre>
+        <p>In GHCi, both groupings unwrap <code>3</code>, multiply by <code>10</code> to get <code>Just 30</code>, and add <code>1</code> to reach <code>Just 31</code>:</p>
+        <pre class="ghci">ghci&gt; (Just 3 &gt;&gt;= next) &gt;&gt;= step
+Just 31
+
+ghci&gt; Just 3 &gt;&gt;= (\x -&gt; next x &gt;&gt;= step)
+Just 31</pre>
+        <div class="controls">
           <button type="button" data-ladder="law-assoc">Run associativity</button>
         </div>
-        <pre class="console" id="monad-laws" aria-live="polite">Press Run.</pre>
+        <pre class="console" id="monad-law-assoc" aria-live="polite">Press Run.</pre>
       </section>
 
       <section id="syntax">
@@ -613,6 +663,6 @@ noto x = if x == True then "This is an even Number" else "This is an ODD number"
   <script src="js/config.js?v=8"></script>
   <script src="js/highlight.js?v=4"></script>
   <script src="js/sandbox.js?v=5"></script>
-  <script src="js/main.js?v=12"></script>
+  <script src="js/main.js?v=14"></script>
 </body>
 </html>

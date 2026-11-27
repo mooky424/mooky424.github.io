@@ -24,19 +24,23 @@
     },
     "bind-stop": {
       out: "monad-bind",
-      text: "ghci> Just 1 >>= next\nNothing\n\nghci> Nothing >>= next\nNothing\n\nnext sees 1 and chooses Nothing. A starting Nothing never calls next."
+      text: "ghci> Just 1 >>= next\nNothing\n\nnext sees 1. 1 is not greater than 2, so it returns Nothing."
+    },
+    "bind-nothing": {
+      out: "monad-bind",
+      text: "ghci> Nothing >>= next\nNothing\n\nThere is no number inside Nothing, so next is never called."
     },
     "law-left": {
-      out: "monad-laws",
-      text: "ghci> return 3 >>= next\nJust 30\n\nghci> next 3\nJust 30\n\nreturn 3 is Just 3. Binding next is the same as calling next on 3."
+      out: "monad-law-left",
+      text: "ghci> return 3 >>= next\nJust 30\n\nghci> next 3\nJust 30\n\nWrapping 3 with return and binding next does the same thing as next 3."
     },
     "law-right": {
-      out: "monad-laws",
-      text: "ghci> Just 3 >>= return\nJust 3\n\nreturn puts the unwrapped 3 straight back into Just."
+      out: "monad-law-right",
+      text: "ghci> Just 3 >>= return\nJust 3\n\nPassing Just 3 into return gives that same Just 3 back."
     },
     "law-assoc": {
-      out: "monad-laws",
-      text: "ghci> (Just 3 >>= next) >>= step\nJust 31\n\nghci> Just 3 >>= (\\x -> next x >>= step)\nJust 31\n\nstep y = Just (y + 1). Both groupings unwrap 3, multiply by 10, then add 1."
+      out: "monad-law-assoc",
+      text: "ghci> (Just 3 >>= next) >>= step\nJust 31\n\nghci> Just 3 >>= (\\x -> next x >>= step)\nJust 31\n\nBoth groupings unwrap 3, multiply by 10 to get Just 30, and add 1 to reach Just 31."
     }
   };
 
